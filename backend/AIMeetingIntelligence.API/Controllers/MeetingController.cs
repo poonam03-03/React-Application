@@ -1,32 +1,23 @@
-﻿using AIMeetingIntelligence.API.Data;
-using AIMeetingIntelligence.API.DTOs;
+﻿using AIMeetingIntelligence.API.DTOs;
 using AIMeetingIntelligence.API.Models;
+using AIMeetingIntelligence.API.Repositories;
 using AIMeetingIntelligence.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace AIMeetingIntelligence.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class MeetingController : ControllerBase
-{
-    private readonly AppDbContext _context;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly PdfService _pdf;
-
-
-    public MeetingController(
-    AppDbContext context,
+public class MeetingController(
+    IMeetingRepository meetingRepository,
     IServiceScopeFactory scopeFactory,
-    PdfService pdf)
-    {
-        _context = context;
-        _scopeFactory = scopeFactory;
-        _pdf = pdf;
-    }
+    PdfService pdf) : ControllerBase
+{
+    private readonly IMeetingRepository _meetingRepository = meetingRepository;
+    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    private readonly PdfService _pdf = pdf;
 
     [HttpPost("upload")]
     public async Task<IActionResult> Upload([FromForm] MeetingUploadDto dto)
@@ -36,32 +27,13 @@ public class MeetingController : ControllerBase
         if (!Directory.Exists(uploads))
             Directory.CreateDirectory(uploads);
 
-        var fileName = $"{Guid.NewGuid()}_{dto.File.FileName}";
-        var filePath = Path.Combine(uploads, fileName);
+        var meeting = await _meetingRepository.UploadMeetingAsync(dto, uploads);
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await dto.File.CopyToAsync(stream);
-        }
-
-        var meeting = new Meeting
-        {
-            Title = dto.Title,
-            FileName = dto.File.FileName,
-            FilePath = fileName,
-            Status = "Uploaded"
-        };
-
-        _context.Meetings.Add(meeting);
-        await _context.SaveChangesAsync();
-       
         _ = Task.Run(async () =>
         {
             using var scope = _scopeFactory.CreateScope();
-
             var processor = scope.ServiceProvider
                 .GetRequiredService<MeetingProcessingService>();
-
             await processor.ProcessMeeting(meeting.Id);
         });
 
@@ -71,17 +43,14 @@ public class MeetingController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMeetings()
     {
-        return Ok(await _context.Meetings
-            .OrderByDescending(x => x.UploadedAt)
-            .ToListAsync());
+        var meetings = await _meetingRepository.GetMeetingsAsync();
+        return Ok(meetings);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Details(Guid id)
     {
-        var meeting = await _context.Meetings
-            .Include(x => x.ActionItems)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        var meeting = await _meetingRepository.GetMeetingDetailsAsync(id);
 
         if (meeting == null)
             return NotFound();
@@ -91,7 +60,6 @@ public class MeetingController : ControllerBase
             meeting.Id,
             meeting.Title,
             meeting.Summary,
-
             ActionItems = meeting.ActionItems.Select(x => new
             {
                 x.Id,
@@ -104,14 +72,10 @@ public class MeetingController : ControllerBase
     [HttpPut("actionitem/{id}")]
     public async Task<IActionResult> ToggleActionItem(Guid id)
     {
-        var item = await _context.ActionItems.FindAsync(id);
+        var item = await _meetingRepository.ToggleActionItemAsync(id);
 
         if (item == null)
             return NotFound();
-
-        item.IsCompleted = !item.IsCompleted;
-
-        await _context.SaveChangesAsync();
 
         return Ok(item);
     }
@@ -119,9 +83,7 @@ public class MeetingController : ControllerBase
     [HttpGet("{id}/pdf")]
     public async Task<IActionResult> Download(Guid id)
     {
-        var meeting = await _context.Meetings
-            .Include(x => x.ActionItems)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        var meeting = await _meetingRepository.GetMeetingWithActionItemsAsync(id);
 
         if (meeting == null)
             return NotFound();
@@ -140,17 +102,12 @@ public class MeetingController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var meeting = await _context.Meetings
-            .Include(x => x.ActionItems)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        var meeting = await _meetingRepository.GetMeetingWithActionItemsAsync(id);
 
         if (meeting == null)
             return NotFound();
 
-        _context.ActionItems.RemoveRange(meeting.ActionItems);
-        _context.Meetings.Remove(meeting);
-
-        await _context.SaveChangesAsync();
+        await _meetingRepository.DeleteMeetingAsync(meeting);
 
         return NoContent();
     }

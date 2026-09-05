@@ -1,9 +1,7 @@
-﻿using AIMeetingIntelligence.API.Data;
-using AIMeetingIntelligence.API.DTOs;
-using AIMeetingIntelligence.API.Models;
+﻿using AIMeetingIntelligence.API.DTOs;
 using AIMeetingIntelligence.API.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using AIMeetingIntelligence.API.Repositories.Interfaces;
 
 namespace AIMeetingIntelligence.API.Controllers;
 
@@ -11,30 +9,22 @@ namespace AIMeetingIntelligence.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IAuthRepository _authRepository;
     private readonly JwtService _jwt;
 
-    public AuthController(AppDbContext context, JwtService jwt)
+    public AuthController(IAuthRepository authRepository, JwtService jwt)
     {
-        _context = context;
+        _authRepository = authRepository;
         _jwt = jwt;
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
-        if (await _context.Users.AnyAsync(x => x.Email == dto.Email))
+        if (await _authRepository.EmailExistsAsync(dto.Email))
             return BadRequest("Email already exists.");
 
-        var user = new User
-        {
-            FullName = dto.FullName,
-            Email = dto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
-        };
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        await _authRepository.RegisterAsync(dto);
 
         return Ok("User Registered Successfully");
     }
@@ -42,8 +32,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+        var user = await _authRepository.GetByEmailAsync(dto.Email);
 
         if (user == null)
             return Unauthorized();

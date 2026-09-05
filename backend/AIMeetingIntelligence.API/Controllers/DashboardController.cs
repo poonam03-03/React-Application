@@ -1,29 +1,23 @@
-﻿using AIMeetingIntelligence.API.Data;
+﻿using AIMeetingIntelligence.API.Repositories.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace AIMeetingIntelligence.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class DashboardController : ControllerBase
+public class DashboardController(IDashboardRepository dashboardRepository) : ControllerBase
 {
-    private readonly AppDbContext _context;
-
-    public DashboardController(AppDbContext context)
-    {
-        _context = context;
-    }
+    private readonly IDashboardRepository _dashboardRepository = dashboardRepository;
 
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
     {
-        var total = await _context.Meetings.CountAsync();
-        var completed = await _context.Meetings.CountAsync(x => x.Status == "Completed");
-        var processing = await _context.Meetings.CountAsync(x => x.Status == "Processing");
-        var uploaded = await _context.Meetings.CountAsync(x => x.Status == "Uploaded");
+        var total = await _dashboardRepository.GetTotalMeetingsAsync();
+        var completed = await _dashboardRepository.GetCompletedMeetingsAsync();
+        var processing = await _dashboardRepository.GetProcessingMeetingsAsync();
+        var uploaded = await _dashboardRepository.GetUploadedMeetingsAsync();
 
         return Ok(new
         {
@@ -34,3 +28,4 @@ public class DashboardController : ControllerBase
         });
     }
 }
+

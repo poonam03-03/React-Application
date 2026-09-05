@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using AIMeetingIntelligence.API.Hubs;
+using AIMeetingIntelligence.API.Repositories;
+using AIMeetingIntelligence.API.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
@@ -18,6 +20,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<MeetingProcessingService>();
 builder.Services.AddScoped<PdfService>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
