@@ -1,0 +1,6 @@
+@AIMeetingIntelligence.API_HostAddress = http://localhost:5079
+
+GET {{AIMeetingIntelligence.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
