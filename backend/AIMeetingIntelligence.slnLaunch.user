@@ -1,0 +1,11 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "AIMeetingIntelligence.API\\AIMeetingIntelligence.API.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
