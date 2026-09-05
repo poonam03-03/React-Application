@@ -1,0 +1,15 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.rsuser
+
+# .NET
+**/bin/
+**/obj/
+
+# Node
+**/node_modules/
+
+# Build
+dist/
